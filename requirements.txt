@@ -1,5 +1,5 @@
 # =============================================================================
-# REVERSE TEMPLATING POC - Dependências
+# REVERSE TEMPLATING POC - Dependencias
 # =============================================================================
 # Instalar com: pip install -r requirements.txt
 # =============================================================================
@@ -7,19 +7,23 @@
 # Interface Web
 streamlit>=1.28.0
 
-# Leitura e extração de PDF
+# Leitura e extracao de PDF (texto nativo)
 pdfplumber>=0.10.0
 
-# Manipulação de PDF (merge de páginas)
+# Manipulacao de PDF (merge de paginas)
 PyPDF2>=3.0.0
 
-# Geração de PDF (overlay)
+# Geracao de PDF (overlay)
 reportlab>=4.0.0
 
-# Preview de PDF (opcional, mas recomendado)
+# Preview de PDF e conversao para imagem
 pymupdf>=1.23.0
 
-# LangChain para orquestração de LLM
+# OCR - Tesseract (para PDFs escaneados)
+pytesseract>=0.3.10
+Pillow>=10.0.0
+
+# LangChain para orquestracao de LLM
 langchain>=0.1.0
 langchain-google-genai>=1.0.0
 langchain-core>=0.1.0
@@ -27,5 +31,19 @@ langchain-core>=0.1.0
 # Google Generative AI (Gemini)
 google-generativeai>=0.3.0
 
-# Opcional: para usar variáveis de ambiente
+# Variaveis de ambiente
 python-dotenv>=1.0.0
+
+# =============================================================================
+# INSTALACAO DO TESSERACT (necessario alem do pip):
+# =============================================================================
+# Windows:
+#   1. Baixe: https://github.com/UB-Mannheim/tesseract/wiki
+#   2. Instale e adicione ao PATH
+#
+# Linux (Ubuntu/Debian):
+#   sudo apt-get install tesseract-ocr tesseract-ocr-por
+#
+# Mac:
+#   brew install tesseract tesseract-lang
+# =============================================================================

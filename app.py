@@ -3,6 +3,11 @@
 REVERSE TEMPLATING POC - Interface Web com Streamlit
 =============================================================================
 
+Suporta qualquer tipo de documento PDF, identificando automaticamente
+todos os campos variaveis encontrados.
+
+Inclui OCR para PDFs escaneados (requer Tesseract instalado).
+
 Execute com: streamlit run app.py
 """
 
@@ -24,12 +29,18 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 
+from dotenv import load_dotenv
+
+# Importa o motor de OCR
+from ocr_engine import (
+    extrair_texto_automatico,
+    verificar_tesseract_instalado,
+    TESSERACT_DISPONIVEL
+)
+
 # =============================================================================
 # CONFIGURACAO
 # =============================================================================
-
-import os
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -159,6 +170,15 @@ st.markdown("""
         font-size: 0.95rem;
         margin-bottom: 1.5rem;
     }
+
+    /* Campo variavel */
+    .field-card {
+        background-color: #1a1a2e;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -167,40 +187,31 @@ st.markdown("""
 # FUNCOES DO PROCESSAMENTO
 # =============================================================================
 
-def extrair_texto_com_coordenadas(pdf_file) -> Tuple[str, List[dict], Tuple[float, float]]:
-    """Extrai texto e coordenadas do PDF."""
-    palavras = []
-    texto_completo = ""
+def extrair_texto_com_coordenadas(pdf_file, forcar_ocr: bool = False) -> Tuple[str, List[dict], Tuple[float, float], str]:
+    """
+    Extrai texto e coordenadas do PDF.
+    Detecta automaticamente se deve usar OCR ou extracao nativa.
 
-    with pdfplumber.open(pdf_file) as pdf:
-        page = pdf.pages[0]
-        texto_completo = page.extract_text() or ""
+    Returns:
+        - texto_completo: String com todo o texto
+        - palavras: Lista de dicts com coordenadas
+        - page_size: Tupla (largura, altura)
+        - metodo: Metodo usado ("pdfplumber" ou "tesseract")
+    """
+    texto, palavras, page_size, metodo = extrair_texto_automatico(
+        pdf_file,
+        forcar_ocr=forcar_ocr,
+        idioma_ocr="por+eng"
+    )
 
-        words = page.extract_words(
-            keep_blank_chars=False,
-            x_tolerance=3,
-            y_tolerance=3
-        )
-
-        for word in words:
-            palavras.append({
-                "text": word["text"],
-                "x0": word["x0"],
-                "top": word["top"],
-                "x1": word["x1"],
-                "bottom": word["bottom"],
-                "width": word["x1"] - word["x0"],
-                "height": word["bottom"] - word["top"]
-            })
-
-        page_width = page.width
-        page_height = page.height
-
-    return texto_completo, palavras, (page_width, page_height)
+    return texto, palavras, page_size, metodo
 
 
-def analisar_com_llm(texto: str) -> Dict[str, str]:
-    """Usa Gemini para identificar variaveis."""
+def analisar_com_llm(texto: str) -> List[dict]:
+    """
+    Usa Gemini para identificar TODOS os campos variaveis do documento.
+    Retorna uma lista de dicionarios com informacoes de cada campo.
+    """
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash-preview-05-20",
         temperature=0,
@@ -209,22 +220,38 @@ def analisar_com_llm(texto: str) -> Dict[str, str]:
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", """Voce e um especialista em analise de documentos.
-Analise o texto de um documento e identifique APENAS os seguintes tipos de dados variaveis:
+Sua tarefa e identificar TODOS os campos variaveis em um documento.
 
-1. NOME_CLIENTE: Nome de pessoa ou empresa (cliente, destinatario, etc.)
-2. VALOR_TOTAL: Valores monetarios no formato brasileiro (R$ X.XXX,XX)
-3. DATA_DOCUMENTO: Datas no formato brasileiro (DD/MM/AAAA ou similar)
+Campos variaveis sao dados que mudam de um documento para outro, como:
+- Nomes de pessoas ou empresas
+- Datas (qualquer formato)
+- Valores monetarios
+- Numeros de documentos (CPF, CNPJ, RG, etc.)
+- Enderecos
+- Telefones e emails
+- Numeros de pedido, fatura, contrato
+- Quantidades
+- Percentuais
+- Qualquer outro dado especifico que nao seja texto fixo do template
 
 IMPORTANTE:
 - Retorne APENAS um JSON valido, sem markdown ou explicacoes
-- O JSON deve mapear o texto exato encontrado para o tipo de variavel
-- Identifique no maximo 1 item de cada tipo (o mais relevante)
-- Se nao encontrar um tipo, nao inclua no JSON
+- O JSON deve ser uma lista de objetos
+- Cada objeto deve ter: "valor_original" (texto exato), "tipo" (categoria), "descricao" (label amigavel)
+- Identifique o maximo de campos variaveis possiveis
+- O "tipo" deve ser um identificador unico em MAIUSCULAS_COM_UNDERSCORE
+- A "descricao" deve ser um texto legivel para exibir ao usuario
 
-Formato de saida esperado:
-{{"texto_original_1": "NOME_CLIENTE", "texto_original_2": "VALOR_TOTAL", "texto_original_3": "DATA_DOCUMENTO"}}
+Exemplo de saida:
+[
+    {{"valor_original": "Joao Silva", "tipo": "NOME_CLIENTE", "descricao": "Nome do Cliente"}},
+    {{"valor_original": "123.456.789-00", "tipo": "CPF_CLIENTE", "descricao": "CPF do Cliente"}},
+    {{"valor_original": "10/12/2024", "tipo": "DATA_EMISSAO", "descricao": "Data de Emissao"}},
+    {{"valor_original": "R$ 1.500,00", "tipo": "VALOR_TOTAL", "descricao": "Valor Total"}},
+    {{"valor_original": "NF-001234", "tipo": "NUMERO_NOTA", "descricao": "Numero da Nota"}}
+]
 """),
-        ("human", "Analise este documento e identifique as variaveis:\n\n{texto}")
+        ("human", "Analise este documento e identifique TODOS os campos variaveis:\n\n{texto}")
     ])
 
     parser = JsonOutputParser()
@@ -232,22 +259,32 @@ Formato de saida esperado:
 
     try:
         resultado = chain.invoke({"texto": texto})
+        # Garante que o resultado e uma lista
+        if isinstance(resultado, dict):
+            resultado = [resultado]
         return resultado
     except Exception as e:
         st.error(f"Erro na analise: {e}")
-        return {}
+        return []
 
 
 def mapear_variaveis_para_coordenadas(
-    variaveis_llm: Dict[str, str],
+    variaveis_llm: List[dict],
     palavras: List[dict]
 ) -> List[dict]:
     """Cruza variaveis com coordenadas."""
     mapeamentos = []
 
-    for texto_original, tipo_variavel in variaveis_llm.items():
-        palavras_busca = texto_original.split()
+    for variavel in variaveis_llm:
+        texto_original = variavel.get("valor_original", "")
+        tipo = variavel.get("tipo", "CAMPO_DESCONHECIDO")
+        descricao = variavel.get("descricao", tipo)
 
+        palavras_busca = texto_original.split()
+        if not palavras_busca:
+            continue
+
+        encontrado = False
         for i, palavra in enumerate(palavras):
             if palavra["text"] == palavras_busca[0]:
                 match = True
@@ -268,9 +305,26 @@ def mapear_variaveis_para_coordenadas(
 
                 if match or len(palavras_busca) == 1:
                     mapeamentos.append({
-                        "tipo": tipo_variavel,
+                        "tipo": tipo,
+                        "descricao": descricao,
                         "texto_original": texto_original,
                         **coords
+                    })
+                    encontrado = True
+                    break
+
+        # Se nao encontrou com match exato, tenta busca parcial
+        if not encontrado and len(palavras_busca) == 1:
+            for palavra in palavras:
+                if palavras_busca[0] in palavra["text"] or palavra["text"] in palavras_busca[0]:
+                    mapeamentos.append({
+                        "tipo": tipo,
+                        "descricao": descricao,
+                        "texto_original": texto_original,
+                        "x0": palavra["x0"],
+                        "top": palavra["top"],
+                        "x1": palavra["x1"],
+                        "bottom": palavra["bottom"]
                     })
                     break
 
@@ -308,11 +362,14 @@ def gerar_pdf_com_substituicoes(
         largura = x1 - x0
         margem = 2
 
+        # Calcula largura necessaria para o novo texto
+        largura_novo_texto = len(novo_valor) * 6  # Estimativa aproximada
+
         c.setFillColorRGB(1, 1, 1)
         c.rect(
             x0 - margem,
             y_reportlab - margem,
-            largura + (margem * 2) + 50,
+            max(largura, largura_novo_texto) + (margem * 2) + 10,
             altura + (margem * 2),
             fill=True,
             stroke=False
@@ -367,6 +424,8 @@ if 'pdf_processado' not in st.session_state:
     st.session_state.pdf_processado = False
 if 'pdf_gerado' not in st.session_state:
     st.session_state.pdf_gerado = None
+if 'metodo_extracao' not in st.session_state:
+    st.session_state.metodo_extracao = None
 
 # =============================================================================
 # ETAPA 1: UPLOAD
@@ -418,17 +477,20 @@ if uploaded_file:
     with col2:
         analisar = st.button("Analisar Documento", type="primary", use_container_width=True)
 
-        if st.session_state.variaveis_encontradas:
-            qtd = len(st.session_state.variaveis_encontradas)
-            st.markdown(f'<br><div class="status-success">{qtd} campo(s) identificado(s) com sucesso</div>', unsafe_allow_html=True)
+        if st.session_state.mapeamentos:
+            qtd = len(st.session_state.mapeamentos)
+            metodo = st.session_state.metodo_extracao or "pdfplumber"
+            metodo_label = "OCR (Tesseract)" if "tesseract" in metodo else "Texto nativo"
+            st.markdown(f'<br><div class="status-success">{qtd} campo(s) identificado(s) via {metodo_label}</div>', unsafe_allow_html=True)
         elif not analisar:
             st.markdown('<br><div class="status-waiting">Aguardando analise do documento</div>', unsafe_allow_html=True)
 
     if analisar:
         with st.spinner("Extraindo texto do documento..."):
             uploaded_file.seek(0)
-            texto, palavras, page_size = extrair_texto_com_coordenadas(uploaded_file)
+            texto, palavras, page_size, metodo = extrair_texto_com_coordenadas(uploaded_file)
             st.session_state.page_size = page_size
+            st.session_state.metodo_extracao = metodo
 
         with st.spinner("Identificando campos variaveis com IA..."):
             variaveis = analisar_com_llm(texto)
@@ -438,6 +500,7 @@ if uploaded_file:
             st.session_state.variaveis_encontradas = variaveis
             st.session_state.mapeamentos = mapeamentos
             st.session_state.pdf_processado = True
+            st.session_state.pdf_gerado = None  # Reset PDF gerado
             st.rerun()
         else:
             st.error("Nao foi possivel identificar campos variaveis no documento.")
@@ -448,60 +511,40 @@ if uploaded_file:
 # ETAPA 3: EDICAO
 # =============================================================================
 
-if st.session_state.variaveis_encontradas:
+if st.session_state.mapeamentos:
     st.markdown('<div class="section-title">Etapa 3: Definir Novos Valores</div>', unsafe_allow_html=True)
 
-    st.markdown('<p class="instruction-text">Preencha os campos abaixo com os novos valores que devem substituir os originais:</p>', unsafe_allow_html=True)
+    st.markdown('<p class="instruction-text">Preencha os campos abaixo com os novos valores que devem substituir os originais. Deixe em branco os campos que nao deseja alterar.</p>', unsafe_allow_html=True)
 
     novos_valores = {}
 
-    # Inverte o dicionario para agrupar por tipo
-    tipos_variaveis = {}
-    for texto, tipo in st.session_state.variaveis_encontradas.items():
-        tipos_variaveis[tipo] = texto
+    # Calcula numero de colunas baseado na quantidade de campos
+    num_campos = len(st.session_state.mapeamentos)
+    num_colunas = min(3, num_campos)  # Maximo 3 colunas
 
-    # Cria colunas para os campos
-    cols = st.columns(3)
+    # Cria campos dinamicamente
+    if num_campos > 0:
+        # Organiza em linhas de 3 colunas
+        for i in range(0, num_campos, 3):
+            cols = st.columns(3)
+            for j in range(3):
+                idx = i + j
+                if idx < num_campos:
+                    mapeamento = st.session_state.mapeamentos[idx]
+                    tipo = mapeamento["tipo"]
+                    descricao = mapeamento.get("descricao", tipo)
+                    valor_atual = mapeamento["texto_original"]
 
-    campo_idx = 0
-
-    if "NOME_CLIENTE" in tipos_variaveis:
-        with cols[campo_idx % 3]:
-            st.markdown('<p class="field-label">Nome do Cliente</p>', unsafe_allow_html=True)
-            st.markdown(f'<p class="field-current">Valor atual: {tipos_variaveis["NOME_CLIENTE"]}</p>', unsafe_allow_html=True)
-            novos_valores["NOME_CLIENTE"] = st.text_input(
-                "nome",
-                value="",
-                placeholder="Digite o novo nome",
-                label_visibility="collapsed",
-                key="nome_input"
-            )
-        campo_idx += 1
-
-    if "VALOR_TOTAL" in tipos_variaveis:
-        with cols[campo_idx % 3]:
-            st.markdown('<p class="field-label">Valor Total</p>', unsafe_allow_html=True)
-            st.markdown(f'<p class="field-current">Valor atual: {tipos_variaveis["VALOR_TOTAL"]}</p>', unsafe_allow_html=True)
-            novos_valores["VALOR_TOTAL"] = st.text_input(
-                "valor",
-                value="",
-                placeholder="Ex: R$ 1.500,00",
-                label_visibility="collapsed",
-                key="valor_input"
-            )
-        campo_idx += 1
-
-    if "DATA_DOCUMENTO" in tipos_variaveis:
-        with cols[campo_idx % 3]:
-            st.markdown('<p class="field-label">Data do Documento</p>', unsafe_allow_html=True)
-            st.markdown(f'<p class="field-current">Valor atual: {tipos_variaveis["DATA_DOCUMENTO"]}</p>', unsafe_allow_html=True)
-            novos_valores["DATA_DOCUMENTO"] = st.text_input(
-                "data",
-                value="",
-                placeholder="Ex: 15/01/2025",
-                label_visibility="collapsed",
-                key="data_input"
-            )
+                    with cols[j]:
+                        st.markdown(f'<p class="field-label">{descricao}</p>', unsafe_allow_html=True)
+                        st.markdown(f'<p class="field-current">Valor atual: {valor_atual}</p>', unsafe_allow_html=True)
+                        novos_valores[tipo] = st.text_input(
+                            descricao,
+                            value="",
+                            placeholder=f"Novo valor para {descricao.lower()}",
+                            label_visibility="collapsed",
+                            key=f"input_{tipo}_{idx}"
+                        )
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
@@ -531,6 +574,7 @@ if st.session_state.variaveis_encontradas:
                         st.session_state.page_size
                     )
                     st.session_state.pdf_gerado = pdf_bytes
+                st.rerun()
 
         if st.session_state.pdf_gerado:
             st.markdown('<br>', unsafe_allow_html=True)
