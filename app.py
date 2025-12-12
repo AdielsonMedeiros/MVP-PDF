@@ -1,12 +1,16 @@
 """
 =============================================================================
-REVERSE TEMPLATING POC - Interface Web com Streamlit
+REVERSE TEMPLATING MVP - Interface Web com Streamlit
 =============================================================================
 
-Suporta qualquer tipo de documento PDF, identificando automaticamente
-todos os campos variaveis encontrados.
+Sistema de identificação e substituição de variáveis em documentos.
+Suporta PDF, Imagens (PNG, JPG, TIFF) e Word (DOCX).
 
-Inclui OCR para PDFs escaneados (requer Tesseract instalado).
+Funcionalidades:
+- Detecção automática de campos com IA (Google Gemini)
+- OCR para documentos escaneados (Tesseract)
+- Banco de templates para reuso
+- Busca por similaridade
 
 Execute com: streamlit run app.py
 """

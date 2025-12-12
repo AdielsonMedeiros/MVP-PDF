@@ -1,15 +1,16 @@
-# 📄 Reverse Templating POC
+# 📄 Reverse Templating MVP
 
-Sistema inteligente de identificação e substituição de variáveis em documentos PDF usando IA.
+Sistema inteligente de identificação e substituição de variáveis em documentos usando IA.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)
 ![Tests](https://img.shields.io/badge/Tests-119%20passing-brightgreen.svg)
 ![Coverage](https://img.shields.io/badge/Coverage-74%25-yellow.svg)
+![Status](https://img.shields.io/badge/Status-MVP-orange.svg)
 
 ## 🎯 O que é?
 
-O **Reverse Templating** é uma prova de conceito que permite:
+O **Reverse Templating** é um produto que automatiza a identificação e substituição de campos variáveis em documentos:
 
 1. **Upload de documentos** - PDF, imagens (PNG, JPG, TIFF) ou Word (DOCX)
 2. **Análise inteligente** - IA identifica automaticamente campos variáveis (nomes, datas, valores, CPFs, etc.)
@@ -24,6 +25,7 @@ O **Reverse Templating** é uma prova de conceito que permite:
 - 💾 **Banco de templates** com SQLite + ChromaDB
 - 🔎 **Busca por similaridade** para encontrar templates parecidos
 - 📊 **Interface web moderna** com Streamlit
+- ✅ **Suite de testes** com 119 testes e 74% de cobertura
 
 ## 🚀 Início Rápido
 
@@ -171,6 +173,23 @@ Os campos identificados são mapeados para suas posições exatas no PDF.
 ### 6. Geração do Documento
 O usuário preenche novos valores e um novo PDF é gerado com as substituições.
 
+## 🗺️ Roadmap
+
+### ✅ MVP (Atual)
+- [x] Suporte a PDF, Imagens e Word
+- [x] Identificação de campos com IA
+- [x] Banco de templates
+- [x] Busca por similaridade
+- [x] Suite de testes
+
+### 🔜 Próximas versões
+- [ ] Suporte a múltiplas páginas
+- [ ] Edição visual de campos
+- [ ] API REST para integração
+- [ ] Autenticação de usuários
+- [ ] Deploy em cloud (AWS/GCP)
+- [ ] Batch processing (múltiplos documentos)
+
 ## 🤝 Contribuindo
 
 1. Faça um fork do projeto
@@ -181,7 +200,7 @@ O usuário preenche novos valores e um novo PDF é gerado com as substituições
 
 ## 📝 Licença
 
-Este projeto é uma Prova de Conceito (POC) para fins de demonstração.
+Este projeto é um MVP (Minimum Viable Product) em desenvolvimento ativo.
 
 ## ⚙️ Configuração para Desenvolvimento
 

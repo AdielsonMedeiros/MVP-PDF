@@ -1,4 +1,4 @@
-# Testes - Reverse Templating POC
+# Testes - Reverse Templating MVP
 
 Este diretório contém a suíte de testes automatizados para o projeto.
 
