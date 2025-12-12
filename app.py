@@ -466,7 +466,7 @@ def gerar_pdf_com_substituicoes(
 
 # Header
 st.markdown('<h1 class="main-header">Reverse Templating</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Sistema de identificacao e substituicao de variaveis em documentos PDF</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Sistema de identificacao e substituicao de variaveis em documentos PDF, Imagens e Word</p>', unsafe_allow_html=True)
 
 # Inicializa session state
 if 'variaveis_encontradas' not in st.session_state:
@@ -499,20 +499,27 @@ if 'arquivo_pdf' not in st.session_state:
 st.markdown('<div class="section-title">Etapa 1: Carregar Documento</div>', unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader(
-    "Selecione o arquivo",
+    "Selecione o documento (PDF, Imagem ou Word)",
     type=['pdf', 'png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif', 'docx', 'doc'],
-    help="Formatos aceitos: PDF, Imagens (PNG, JPG, JPEG, BMP, TIFF), Word (DOCX, DOC)"
+    help="📄 PDF | 🖼️ Imagens (PNG, JPG, BMP, TIFF) | 📝 Word (DOCX, DOC)"
 )
 
 if uploaded_file:
     # Detecta o tipo de arquivo
     filename = uploaded_file.name
-    tipo_arquivo = "PDF" if eh_pdf(filename) else "Imagem" if eh_imagem(filename) else "Word" if eh_word(filename) else "Desconhecido"
+    if eh_pdf(filename):
+        tipo_arquivo = "📄 PDF"
+    elif eh_imagem(filename):
+        tipo_arquivo = "🖼️ Imagem"
+    elif eh_word(filename):
+        tipo_arquivo = "📝 Word"
+    else:
+        tipo_arquivo = "📁 Documento"
 
-    st.markdown(f'<div class="status-success">Arquivo carregado: {uploaded_file.name} ({tipo_arquivo})</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="status-success">✅ Arquivo carregado: {uploaded_file.name} ({tipo_arquivo})</div>', unsafe_allow_html=True)
 
     st.markdown("")
-    st.markdown("**Visualizacao do documento:**")
+    st.markdown("**📋 Visualização do documento:**")
 
     # Centraliza o preview
     col_left, col_center, col_right = st.columns([1, 2, 1])
